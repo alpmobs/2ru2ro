@@ -138,6 +138,11 @@
       height: 44px;
       padding: 6px;
       cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+      overflow: hidden;
+      display: block;
     }
 
     input[type="file"]:hover,
@@ -525,6 +530,14 @@
       display: none;
     }
 
+    .mobile-note {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: var(--blue);
+      font-family: var(--mono);
+    }
+
     @media (max-width: 980px) {
       .app {
         grid-template-columns: 1fr;
@@ -539,9 +552,18 @@
         min-height: 420px;
       }
 
+      input[type="color"] {
+        height: 48px;
+        padding: 4px;
+      }
+
       .stage-actions {
         flex-wrap: wrap;
         align-items: stretch;
+      }
+
+      #downloadBtn {
+        display: none;
       }
     }
   </style>
@@ -573,6 +595,8 @@
         <small>Use this color for the next pins.</small>
       </div>
 
+      <div class="mobile-note">This tool is not mobile-ready. Please use it on desktop for the best experience.</div>
+
       <div class="button-row">
         <button id="clearPinsBtn" class="secondary" disabled>Clear all pins</button>
       </div>
@@ -590,6 +614,7 @@
           <input id="imageUpload" type="file" accept="image/*">
         </div>
         <button id="downloadBtn" class="primary" disabled>Export</button>
+        <div id="status-download" class="status"></div>
       </div>
       <div id="canvasWrap" class="canvas-wrap">
         <div id="placeholder" class="placeholder">Your uploaded image will appear here. After that, click the image to
@@ -615,6 +640,7 @@
     const downloadBtn = document.getElementById("downloadBtn");
     const clearPinsBtn = document.getElementById("clearPinsBtn");
     const statusEl = document.getElementById("status");
+    const downloadStatusEl = document.getElementById("status-download");
     const emptyStateEl = document.getElementById("emptyState");
     const pinList = document.getElementById("pinList");
     const placeholder = document.getElementById("placeholder");
@@ -965,6 +991,10 @@
       statusEl.textContent = message;
     }
 
+    function setDownloadStatus(message) {
+      downloadStatusEl.textContent = message;
+    }
+
     function escapeHtml(value) {
       return value
         .replaceAll("&", "&amp;")
@@ -1110,7 +1140,7 @@
       const exportTimestamp = formatExportTimestamp(new Date());
       link.download = `2ru2ro-annotated-${exportTimestamp}.png`;
       link.click();
-      setStatus("Download started.");
+      setDownloadStatus("Download started.");
     }
 
     function wrapText(ctx, text, maxWidth, font = "16px Georgia") {
