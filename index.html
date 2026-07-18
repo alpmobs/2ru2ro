@@ -410,6 +410,7 @@
       -webkit-appearance: none;
       display: block;
       cursor: grab;
+      z-index: 2;
     }
 
     .pin.active {
@@ -429,12 +430,19 @@
       box-shadow: 0 14px 26px rgba(31, 41, 51, 0.12);
       text-align: left;
       pointer-events: auto;
+      z-index: 3;
+      cursor: pointer;
+    }
+
+    .pin-popover:hover .pin-preview {
+      transform: translateY(-1px);
     }
 
     .pin-node {
       position: absolute;
       width: 0;
       height: 0;
+      z-index: 1;
     }
 
     .pin-preview strong {
@@ -702,7 +710,7 @@
         return;
       }
 
-      if (event.target.closest(".pin")) {
+      if (event.target.closest(".pin, .pin-popover")) {
         return;
       }
 
@@ -814,8 +822,30 @@
           `;
         }
 
-        popoverEl.addEventListener("pointerdown", (event) => event.stopPropagation());
-        popoverEl.addEventListener("click", (event) => event.stopPropagation());
+        popoverEl.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+          if (event.target.closest("input, textarea, button")) {
+            return;
+          }
+          selectedPinId = pin.id;
+          fillFormFromSelectedPin();
+          renderPins();
+          renderPinList();
+          setStatus(`Selected pin ${pin.id}.`);
+        });
+        popoverEl.addEventListener("mousedown", (event) => event.stopPropagation());
+        popoverEl.addEventListener("touchstart", (event) => event.stopPropagation());
+        popoverEl.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (event.target.closest("input, textarea, button")) {
+            return;
+          }
+          selectedPinId = pin.id;
+          fillFormFromSelectedPin();
+          renderPins();
+          renderPinList();
+          setStatus(`Selected pin ${pin.id}.`);
+        });
         pinNode.appendChild(pinEl);
         pinNode.appendChild(popoverEl);
 
