@@ -1,6 +1,8 @@
 # 2RU-2RO
+Live: [alpmobs.github.io/2ru2ro](https://alpmobs.github.io/2ru2ro/)
 
-Developed by [alpmobs](https://alpmobs.webflow.io/)
+Developed by Ralph Mabeza / [alpmobs](https://alpmobs.webflow.io/)
+
 
 ## Overview
 
