@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Pin Annotator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@100..900&family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Modak&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #E9E9E9;
+      --panel: #E9E9E9;
+      --ink: #222;
+      --muted: #999;
+      --blue: #1a3aff;
+      --label: #222222;
+      --accent: #c25b2a;
+      --accent-dark: #8f3f19;
+      --line: #fff;
+      --shadow: 0 20px 45px rgba(72, 53, 37, 0.18);
+      --mono: "Azeret Mono", ui-monospace, monospace;
+      --sans: "Instrument Sans", system-ui, sans-serif;
+      --line2: #ededed;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    .app {
+      width: 100%;
+      margin: 0;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 0;
+      align-items: start;
+    }
+
+    .panel,
+    .stage-card {
+      background: var(--panel);
+      /* border: 1px solid var(--line); */
+      backdrop-filter: blur(14px);
+    }
+
+    .panel {
+      background: #fff;
+      min-height: 100vh;
+      padding: 2rem;
+      position: sticky;
+      border-right: 1px solid var(--line2);
+      top: 0;
+    }
+
+
+    h1 {
+      margin: 0;
+      color: var(--blue);
+      font-size: 4rem;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-family: "Modak", system-ui;
+      font-weight: 400;
+    }
+
+    .lead,
+    .hint,
+    .empty {
+      color: var(--muted);
+    }
+
+    .empty {
+      font-size: 0.9rem;
+    margin-top: 14px;
+    }
+
+    .lead {
+      margin: 0 0 32px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      line-height: 1.5;
+      color: var(--ink)
+    }
+
+    .field {
+      margin-bottom: 24px;
+    }
+
+    .field label {
+      display: block;
+      color: var(--blue);
+      margin-bottom: 6px;
+      font-family: var(--mono);
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
+    }
+
+    .field small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      line-height: 1.4;
+    }
+
+    input[type="file"],
+    input[type="text"],
+    textarea,
+    input[type="color"] {
+      width: 100%;
+      border: 1px solid var(--line2);
+      padding: 12px 14px;
+      font-family: var(--mono);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    input[type="color"] {
+      height: 44px;
+      padding: 6px;
+      cursor: pointer;
+    }
+
+    input[type="file"]:hover,
+    input[type="file"]:focus,
+    input[type="file"]:focus-visible,
+    input[type="text"]:hover,
+    input[type="text"]:focus,
+    input[type="text"]:focus-visible,
+    textarea:hover,
+    textarea:focus,
+    textarea:focus-visible,
+    input[type="color"]:hover,
+    input[type="color"]:focus,
+    input[type="color"]:focus-visible {
+      border-color: var(--blue);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 88px;
+      resize: vertical;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: 0;
+      padding: 12px 18px;
+      font-weight: 300;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      transition: transform 140ms ease, opacity 140ms ease, background 140ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      color: #fff;
+      background: var(--blue);
+      padding: 16px 10%;
+    }
+
+    .secondary {
+      color: var(--blue);
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--blue);
+    }
+
+    .btn-save {
+      color: #fff;
+      background: var(--blue);
+    }
+
+    #clearPinsBtn {
+      width: 100%;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .author {
+      margin-bottom: 10px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      display: block;
+      color: var(--ink);
+    }
+
+     .author a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .pin-list {
+      margin-top: 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .pin-item {
+      border: 1px solid var(--blue);
+      background: rgba(255, 255, 255, 0.82);
+      padding: 14px;
+    }
+
+    .pin-item.active {
+      background-color: var(--blue);
+      color: #fff;
+    }
+
+    .pin-item.active .secondary {
+      color: #fff;
+      background: var(--blue);
+      border: 1px solid #fff;
+    }
+
+    .pin-item .hint {
+      color: #fff;
+    }
+
+    .pin-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pinHasTitle {
+    margin-top: 1rem;
+    border-top: 1px dashed;
+    padding-top: 1rem;
+  }
+
+    .pin-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      color: white;
+      font-size: 0.92rem;
+      font-weight: 700;
+      background: var(--blue);
+      flex: 0 0 auto;
+    }
+
+    .pin-item.active .pin-badge {
+      background: #fff;
+      color: var(--blue);
+    }
+
+    .pin-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .pin-actions button {
+      padding: 8px 12px;
+      font-size: 0.7rem;
+    }
+
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .icon-button svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+      pointer-events: none;
+    }
+
+    .delete-button {
+      min-width: 38px;
+      min-height: 38px;
+      padding: 8px;
+      color: var(--blue);
+      background: #fff;
+      border: none;
+    }
+
+    .pin-item.active .delete-button {
+      color: #fff;
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .stage-card {
+      padding: 2rem;
+    }
+
+    .stage-actions {
+      display: flex;
+      align-items: end;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .stage-actions .field {
+      flex: 1 1 auto;
+      margin-bottom: 0;
+    }
+
+    .stage-actions button {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      min-height: 540px;
+      overflow: auto;
+      background:
+        linear-gradient(45deg, rgba(31, 41, 51, 0.04) 25%, transparent 25%, transparent 75%, rgba(31, 41, 51, 0.04) 75%),
+        linear-gradient(45deg, rgba(31, 41, 51, 0.04) 25%, transparent 25%, transparent 75%, rgba(31, 41, 51, 0.04) 75%);
+      background-position: 0 0, 14px 14px;
+      background-size: 28px 28px;
+      border: 1px solid var(--line);
+    }
+
+    .placeholder {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .image-layer {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      user-select: none;
+    }
+
+    .image-layer img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .pin {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      margin-left: -10px;
+      margin-top: -10px;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: #1a3aff;
+      color: transparent;
+      font-size: 0;
+      line-height: 0;
+      box-shadow: 0 4px 12px rgba(26, 58, 255, 0.28);
+      appearance: none;
+      -webkit-appearance: none;
+      display: block;
+      cursor: grab;
+    }
+
+    .pin.active {
+      outline: 3px solid rgba(26, 58, 255, 0.25);
+    }
+
+    .pin-popover {
+      position: absolute;
+      top: -2px;
+      left: 0;
+      min-width: 170px;
+      width: 240px;
+      padding: 10px 12px;
+      background: #fff;
+      color: var(--ink);
+      border: 1px solid var(--blue);
+      box-shadow: 0 14px 26px rgba(31, 41, 51, 0.12);
+      text-align: left;
+      pointer-events: auto;
+    }
+
+    .pin-node {
+      position: absolute;
+      width: 0;
+      height: 0;
+    }
+
+    .pin-preview strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.92rem;
+      color: var(--blue);
+      font-weight: 300;
+    }
+
+    .pin-preview span {
+      display: block;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: var(--muted);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .pin-preview .pin-badge {
+      display: inline-flex;
+      color: white;
+      margin-right: 6px;
+    }
+
+    .pin-editor {
+      display: grid;
+      gap: 8px;
+    }
+
+    .pin-editor-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--blue);
+    }
+
+    .pin-editor-title strong {
+      font-weight: 300;
+    }
+
+    .pin-editor input,
+    .pin-editor textarea {
+      width: 100%;
+      border: 1px solid var(--line2);
+      padding: 8px 10px;
+      font-size: 0.7rem;
+      font-family: var(--mono);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.96);
+    }
+
+    .pin-editor input:hover,
+    .pin-editor input:focus,
+    .pin-editor input:focus-visible,
+    .pin-editor textarea:hover,
+    .pin-editor textarea:focus,
+    .pin-editor textarea:focus-visible {
+      border-color: var(--blue);
+      outline: none;
+    }
+
+    .pin-editor textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .pin-editor-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pin-editor-actions button {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+
+    .status {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: var(--blue);
+      font-weight: 400;
+      display: none;
+    }
+
+    .status:not(:empty) {
+      display: block;
+    }
+
+    .status:not(:empty) + .empty {
+      display: none;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        min-height: auto;
+        position: static;
+      }
+
+      .canvas-wrap {
+        min-height: 420px;
+      }
+
+      .stage-actions {
+        flex-wrap: wrap;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="panel">
+      <h1>2RU-2RO</h1>
+      <span class="author">by <a href="https://github.com/alpmobs">alpmobs</a></span>
+      <p class="lead">Upload any image, click on the picture to place a pin, and attach a title plus description for
+        each point. You can add as many pins as you want and export the result as a downloadable PNG.</p>
+
+      <div class="field">
+        <label for="titleInput">Pin title</label>
+        <input id="titleInput" type="text" placeholder="Two sections">
+        <small>Use this title for the next pins.</small>
+      </div>
+
+      <div class="field">
+        <label for="descriptionInput">Pin description</label>
+        <textarea id="descriptionInput" placeholder="Add spacing here."></textarea>
+        <small>Use this description for the next pins.</small>
+      </div>
+
+      <div class="field">
+        <label for="pinColorInput">Pin color</label>
+        <input id="pinColorInput" type="color" value="#1a3aff">
+        <small>Use this color for the next pins.</small>
+      </div>
+
+      <div class="button-row">
+        <button id="clearPinsBtn" class="secondary" disabled>Clear all pins</button>
+      </div>
+
+      <div id="status" class="status"></div>
+      <div id="emptyState" class="empty">No pins yet. Add one by clicking on the uploaded image.</div>
+
+      <div id="pinList" class="pin-list"></div>
+    </aside>
+
+    <section class="stage-card">
+      <div class="stage-actions">
+        <div class="field">
+          <label for="imageUpload">Upload image</label>
+          <input id="imageUpload" type="file" accept="image/*">
+        </div>
+        <button id="downloadBtn" class="primary" disabled>Export</button>
+      </div>
+      <div id="canvasWrap" class="canvas-wrap">
+        <div id="placeholder" class="placeholder">Your uploaded image will appear here. After that, click the image to
+          drop a pin.</div>
+        <div id="imageLayer" class="image-layer" hidden>
+          <img id="mainImage" alt="Uploaded preview" hidden>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const trashIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
+  <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/>
+</svg>
+    `;
+
+    const imageUpload = document.getElementById("imageUpload");
+    const titleInput = document.getElementById("titleInput");
+    const descriptionInput = document.getElementById("descriptionInput");
+    const pinColorInput = document.getElementById("pinColorInput");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const clearPinsBtn = document.getElementById("clearPinsBtn");
+    const statusEl = document.getElementById("status");
+    const emptyStateEl = document.getElementById("emptyState");
+    const pinList = document.getElementById("pinList");
+    const placeholder = document.getElementById("placeholder");
+    const imageLayer = document.getElementById("imageLayer");
+    const mainImage = document.getElementById("mainImage");
+
+    let imageDataUrl = "";
+    let pins = [];
+    let selectedPinId = null;
+    let dragState = null;
+
+    imageUpload.addEventListener("change", handleImageUpload);
+    imageLayer.addEventListener("click", handleImageClick);
+    downloadBtn.addEventListener("click", downloadAnnotatedImage);
+    clearPinsBtn.addEventListener("click", clearPins);
+    titleInput.addEventListener("input", syncSelectedPinFromForm);
+    descriptionInput.addEventListener("input", syncSelectedPinFromForm);
+    pinColorInput.addEventListener("input", syncSelectedPinFromForm);
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        imageDataUrl = reader.result;
+        mainImage.src = imageDataUrl;
+        mainImage.hidden = false;
+        imageLayer.hidden = false;
+        placeholder.hidden = true;
+        pins = [];
+        selectedPinId = null;
+        renderPins();
+        renderPinList();
+        updateButtons();
+        setStatus("Image loaded. Click anywhere on it to add your first pin.");
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function getNextPinId() {
+      let nextId = 1;
+      const usedIds = new Set(pins.map((pin) => pin.id));
+
+      while (usedIds.has(nextId)) {
+        nextId += 1;
+      }
+
+      return nextId;
+    }
+
+    function handleImageClick(event) {
+      if (!imageDataUrl || dragState) {
+        return;
+      }
+
+      if (event.target.closest(".pin")) {
+        return;
+      }
+
+      const rect = mainImage.getBoundingClientRect();
+      const xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+      const yPercent = clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+      const nextPinId = getNextPinId();
+
+      const pin = {
+        id: nextPinId,
+        title: titleInput.value.trim(),
+        description: descriptionInput.value.trim(),
+        color: pinColorInput.value || "#1a3aff",
+        xPercent,
+        yPercent
+      };
+
+      pins.push(pin);
+      selectedPinId = pin.id;
+      renderPins();
+      renderPinList();
+      updateButtons();
+      setStatus(`Added pin ${pin.id}.`);
+    }
+
+    function renderPins() {
+      imageLayer.querySelectorAll(".pin-node").forEach((pinNode) => pinNode.remove());
+
+      pins.forEach((pin) => {
+        const hasPinValue = Boolean(pin.title || pin.description);
+        const pinNode = document.createElement("div");
+        pinNode.className = "pin-node";
+        pinNode.dataset.id = String(pin.id);
+        pinNode.style.left = `${pin.xPercent}%`;
+        pinNode.style.top = `${pin.yPercent}%`;
+
+        const pinEl = document.createElement("button");
+        pinEl.type = "button";
+        pinEl.className = `pin${pin.id === selectedPinId ? " active" : ""}`;
+        pinEl.dataset.id = String(pin.id);
+        pinEl.setAttribute("aria-label", `Pin ${pin.id}`);
+        pinEl.style.backgroundColor = pin.color || "#1a3aff";
+
+        const popoverEl = document.createElement("div");
+        popoverEl.className = "pin-popover";
+        popoverEl.style.borderColor = pin.color || "#1a3aff";
+
+        if (pin.id === selectedPinId) {
+          popoverEl.innerHTML = `
+            <div class="pin-editor">
+              <div class="pin-editor-title">
+                <span>Pin ${pin.id}</span>
+                <strong>${escapeHtml(pin.title || "")}</strong>
+              </div>
+              <input type="text" data-editor="title" value="${escapeHtmlAttr(pin.title || "")}" placeholder="Pin title">
+              <textarea data-editor="description" placeholder="Pin description">${escapeHtml(pin.description || "")}</textarea>
+              <div class="pin-editor-actions">
+                <button type="button" class="secondary${hasPinValue ? " btn-save" : ""}" data-action="close">${hasPinValue ? "Save" : "Close"}</button>
+                <button type="button" class="secondary icon-button delete-button" data-action="delete" aria-label="Delete pin">${trashIcon}</button>
+              </div>
+            </div>
+          `;
+
+          const titleEditor = popoverEl.querySelector('[data-editor="title"]');
+          const descriptionEditor = popoverEl.querySelector('[data-editor="description"]');
+          const closeButton = popoverEl.querySelector('[data-action="close"]');
+          const deleteButton = popoverEl.querySelector('[data-action="delete"]');
+
+          [titleEditor, descriptionEditor].forEach((editor) => {
+            editor.addEventListener("pointerdown", (event) => event.stopPropagation());
+            editor.addEventListener("click", (event) => event.stopPropagation());
+            editor.addEventListener("input", () => {
+              pin.title = titleEditor.value.trim();
+              pin.description = descriptionEditor.value.trim();
+              const shouldSave = Boolean(pin.title || pin.description);
+              closeButton.textContent = shouldSave ? "Save" : "Close";
+              closeButton.classList.toggle("btn-save", shouldSave);
+              pin.color = pinColorInput.value || "#1a3aff";
+              syncFormFromPin(pin);
+              renderPinList();
+              updateButtons();
+            });
+          });
+
+          closeButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            selectedPinId = null;
+            clearForm();
+            renderPins();
+            renderPinList();
+          });
+
+          deleteButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            deletePin(pin.id);
+          });
+        } else {
+          const previewTitle = pin.title
+            ? `<strong><span class="pin-badge">${pin.id}</span> ${escapeHtml(pin.title)}</strong>`
+            : `<strong>Pin ${pin.id}</strong>`;
+          const previewDescription = pin.description
+            ? `<span>${escapeHtml(pin.description)}</span>`
+            : "";
+          popoverEl.innerHTML = `
+            <div class="pin-preview">
+              ${previewTitle}
+              ${previewDescription}
+            </div>
+          `;
+        }
+
+        popoverEl.addEventListener("pointerdown", (event) => event.stopPropagation());
+        popoverEl.addEventListener("click", (event) => event.stopPropagation());
+        pinNode.appendChild(pinEl);
+        pinNode.appendChild(popoverEl);
+
+        pinEl.addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectedPinId = pin.id;
+          fillFormFromSelectedPin();
+          renderPins();
+          renderPinList();
+          setStatus(`Selected pin ${pin.id}.`);
+        });
+
+        pinEl.addEventListener("pointerdown", (event) => {
+          event.stopPropagation();
+          selectedPinId = pin.id;
+          fillFormFromSelectedPin();
+          dragState = { id: pin.id };
+          pinEl.setPointerCapture(event.pointerId);
+          renderPins();
+          renderPinList();
+        });
+
+        imageLayer.appendChild(pinNode);
+      });
+    }
+
+    function renderPinList() {
+      pinList.innerHTML = "";
+      emptyStateEl.hidden = pins.length > 0;
+
+      if (!pins.length) {
+        return;
+      }
+
+      pins.forEach((pin) => {
+        const item = document.createElement("div");
+        item.className = `pin-item${pin.id === selectedPinId ? " active" : ""}`;
+        const listTitle = pin.title
+          ? `<div class="pinHasTitle"><strong>${escapeHtml(pin.title)}</strong></div>`
+          : "";
+        const listDescription = pin.description
+          ? `<div class="hint">${escapeHtml(pin.description)}</div>`
+          : "";
+        item.innerHTML = `
+          <div class="pin-top">
+            <div class="pin-badge">${pin.id}</div>
+            <div class="pin-actions">
+              <button type="button" class="secondary" data-action="select">Edit</button>
+              <button type="button" class="secondary icon-button delete-button" data-action="delete" aria-label="Delete pin">${trashIcon}</button>
+            </div>
+          </div>
+          ${listTitle}
+          ${listDescription}
+        `;
+
+        item.querySelector('[data-action="select"]').addEventListener("click", () => {
+          selectedPinId = pin.id;
+          fillFormFromSelectedPin();
+          renderPins();
+          renderPinList();
+          setStatus(`Editing pin ${pin.id}.`);
+        });
+
+        item.querySelector('[data-action="delete"]').addEventListener("click", () => {
+          deletePin(pin.id);
+        });
+
+        pinList.appendChild(item);
+      });
+    }
+
+    function fillFormFromSelectedPin() {
+      const selectedPin = pins.find((pin) => pin.id === selectedPinId);
+      if (!selectedPin) {
+        return;
+      }
+      titleInput.value = selectedPin.title;
+      descriptionInput.value = selectedPin.description;
+      pinColorInput.value = selectedPin.color || "#1a3aff";
+    }
+
+    function syncFormFromPin(pin) {
+      if (pin.id !== selectedPinId) {
+        return;
+      }
+      titleInput.value = pin.title;
+      descriptionInput.value = pin.description;
+      pinColorInput.value = pin.color || "#1a3aff";
+    }
+
+    function clearForm() {
+      titleInput.value = "";
+      descriptionInput.value = "";
+      pinColorInput.value = "#1a3aff";
+    }
+
+    function syncSelectedPinFromForm() {
+      const selectedPin = pins.find((pin) => pin.id === selectedPinId);
+      if (!selectedPin) {
+        return;
+      }
+      selectedPin.title = titleInput.value.trim();
+      selectedPin.description = descriptionInput.value.trim();
+      selectedPin.color = pinColorInput.value || "#1a3aff";
+      renderPins();
+      renderPinList();
+      updateButtons();
+    }
+
+    function deletePin(pinId) {
+      pins = pins.filter((entry) => entry.id !== pinId);
+      if (selectedPinId === pinId) {
+        selectedPinId = pins[0]?.id ?? null;
+        if (selectedPinId) {
+          fillFormFromSelectedPin();
+        } else {
+          clearForm();
+        }
+      }
+      renderPins();
+      renderPinList();
+      updateButtons();
+      setStatus(`Deleted pin ${pinId}.`);
+    }
+
+    function handlePointerMove(event) {
+      if (!dragState) {
+        return;
+      }
+
+      const rect = mainImage.getBoundingClientRect();
+      const selectedPin = pins.find((pin) => pin.id === dragState.id);
+      if (!selectedPin || rect.width === 0 || rect.height === 0) {
+        return;
+      }
+
+      selectedPin.xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
+      selectedPin.yPercent = clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+      renderPins();
+    }
+
+    function stopDragging() {
+      if (!dragState) {
+        return;
+      }
+      dragState = null;
+      renderPins();
+      setStatus("Pin moved.");
+    }
+
+    function clearPins() {
+      pins = [];
+      selectedPinId = null;
+      clearForm();
+      renderPins();
+      renderPinList();
+      updateButtons();
+      setStatus("All pins cleared.");
+    }
+
+    function hasPinContent() {
+      return pins.some((pin) => pin.title.trim() || pin.description.trim());
+    }
+
+    function updateButtons() {
+      const hasImage = Boolean(imageDataUrl);
+      const hasPins = pins.length > 0;
+      const hasContent = hasPinContent();
+      downloadBtn.disabled = !hasImage || !hasContent;
+      clearPinsBtn.disabled = !hasPins;
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function escapeHtmlAttr(value) {
+      return escapeHtml(value).replaceAll("\n", "&#10;");
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function getCanvasFontFamily(fontFamily) {
+      return fontFamily || "sans-serif";
+    }
+
+    function downloadAnnotatedImage() {
+      if (!imageDataUrl || !hasPinContent()) {
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = mainImage.naturalWidth;
+      canvas.height = mainImage.naturalHeight;
+
+      ctx.drawImage(mainImage, 0, 0);
+      ctx.textBaseline = "top";
+
+      const imageRect = mainImage.getBoundingClientRect();
+      const scaleX = canvas.width / imageRect.width;
+      const scaleY = canvas.height / imageRect.height;
+
+      pins.forEach((pin) => {
+        const pinNode = imageLayer.querySelector(`.pin-node[data-id="${pin.id}"]`);
+        const pinEl = pinNode?.querySelector(`.pin[data-id="${pin.id}"]`);
+        if (!pinNode || !pinEl) {
+          return;
+        }
+
+        const popoverEl = pinNode.querySelector(".pin-popover");
+        if (!popoverEl) {
+          return;
+        }
+
+        const pinNodeRect = pinNode.getBoundingClientRect();
+        const pinRect = pinEl.getBoundingClientRect();
+        const popoverRect = popoverEl.getBoundingClientRect();
+        const pinStyle = window.getComputedStyle(pinEl);
+        const popoverStyle = window.getComputedStyle(popoverEl);
+        const pinSize = parseFloat(pinStyle.width) || 28;
+        const pinRadius = (pinSize / 2) * scaleX;
+        const pinLeft = (pinRect.left - imageRect.left) * scaleX;
+        const pinTop = (pinRect.top - imageRect.top) * scaleY;
+        const pinNodeLeft = (pinNodeRect.left - imageRect.left) * scaleX;
+        const pinNodeTop = (pinNodeRect.top - imageRect.top) * scaleY;
+        const pinCenterX = pinLeft + ((parseFloat(pinStyle.width) || 28) * scaleX / 2);
+        const pinCenterY = pinTop + ((parseFloat(pinStyle.height) || 28) * scaleY / 2);
+        const title = pin.title.trim();
+        const description = pin.description.trim();
+        if (!title && !description) {
+          return;
+        }
+        const popoverLeft = parseFloat(popoverStyle.left) || 0;
+        const popoverTop = parseFloat(popoverStyle.top) || 0;
+        const boxX = pinNodeLeft + (popoverLeft * scaleX);
+        const boxY = pinNodeTop + (popoverTop * scaleY);
+        const boxWidth = popoverRect.width * scaleX;
+        const boxInnerWidth = boxWidth - (24 * scaleX);
+        const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+        const canvasFontFamily = getCanvasFontFamily(window.getComputedStyle(document.body).fontFamily);
+        const titleFontSize = (0.92 * rootFontSize) * scaleX;
+        const bodyFontSize = (0.82 * rootFontSize) * scaleX;
+        const titleLineHeight = titleFontSize * 1.25;
+        const bodyLineHeight = bodyFontSize * 1.4;
+        const boxPaddingX = 12 * scaleX;
+        const boxPaddingTop = 10 * scaleY;
+        const boxPaddingBottom = 10 * scaleY;
+        const boxRadius = (parseFloat(popoverStyle.borderRadius) || 0) * scaleX;
+        const lines = description
+          ? wrapText(ctx, description, boxInnerWidth, `${bodyFontSize}px ${canvasFontFamily}`)
+          : [];
+        const titleWrap = title
+          ? wrapText(ctx, title, boxInnerWidth, `300 ${titleFontSize}px ${canvasFontFamily}`)
+          : [];
+        const titleBlockHeight = titleWrap.length * titleLineHeight;
+        const bodyBlockHeight = lines.length * bodyLineHeight;
+        const contentGap = titleWrap.length && lines.length ? 4 * scaleY : 0;
+        const boxHeight = Math.max(
+          popoverRect ? popoverRect.height * scaleY : 0,
+          boxPaddingTop + titleBlockHeight + contentGap + bodyBlockHeight + boxPaddingBottom
+        );
+
+        ctx.fillStyle = pin.color || "#1a3aff";
+        ctx.beginPath();
+        ctx.arc(pinCenterX, pinCenterY, pinRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = popoverStyle.backgroundColor || "#fff";
+        roundRect(ctx, boxX, boxY, boxWidth, boxHeight, boxRadius);
+        ctx.fill();
+
+        ctx.strokeStyle = pin.color || "#1a3aff";
+        ctx.lineWidth = (parseFloat(popoverStyle.borderWidth) || 1) * Math.max(scaleX, scaleY);
+        roundRect(ctx, boxX, boxY, boxWidth, boxHeight, boxRadius);
+        ctx.stroke();
+
+        ctx.fillStyle = pin.color || "#1a3aff";
+        ctx.textAlign = "left";
+        ctx.font = `300 ${titleFontSize}px ${canvasFontFamily}`;
+        titleWrap.forEach((line, index) => {
+          const lineY = boxY + boxPaddingTop + (index * titleLineHeight);
+          ctx.fillText(line, boxX + boxPaddingX, lineY);
+        });
+
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#5c6773";
+        ctx.font = `${bodyFontSize}px ${canvasFontFamily}`;
+        lines.forEach((line, index) => {
+          const lineY = boxY + boxPaddingTop + titleBlockHeight + contentGap + (index * bodyLineHeight);
+          ctx.fillText(line, boxX + boxPaddingX, lineY);
+        });
+      });
+
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = "annotated-image.png";
+      link.click();
+      setStatus("Download started.");
+    }
+
+    function wrapText(ctx, text, maxWidth, font = "16px Georgia") {
+      ctx.font = font;
+      const words = text.split(/\s+/).filter(Boolean);
+      const lines = [];
+      let currentLine = "";
+
+      if (!words.length) {
+        return [""];
+      }
+
+      words.forEach((word) => {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      });
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      return lines;
+    }
+
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+  </script>
+</body>
+
+</html>
