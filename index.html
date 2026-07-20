@@ -526,9 +526,13 @@
     .status {
       margin-top: 14px;
       font-size: 0.9rem;
-      color: var(--blue);
+      color: #fff;
       font-weight: 400;
       display: none;
+      margin-bottom: 14px;
+      text-align: center;
+      background: var(--blue);
+      padding: 1rem 0;
     }
 
     .status:not(:empty) {
@@ -623,8 +627,8 @@
           <input id="imageUpload" type="file" accept="image/*">
         </div>
         <button id="downloadBtn" class="primary" disabled>Export</button>
-        <div id="status-download" class="status"></div>
       </div>
+      <div id="status-download" class="status"></div>
       <div id="canvasWrap" class="canvas-wrap">
         <div id="placeholder" class="placeholder">Your uploaded image will appear here. After that, click the image to
           drop a pin.</div>
