@@ -22,6 +22,7 @@
       --accent: #c25b2a;
       --accent-dark: #8f3f19;
       --line: #fff;
+      --backdrop: #ffffff;
       --shadow: 0 20px 45px rgba(72, 53, 37, 0.18);
       --mono: "Azeret Mono", ui-monospace, monospace;
       --sans: "Instrument Sans", system-ui, sans-serif;
@@ -143,6 +144,25 @@
       border-radius: 0;
       overflow: hidden;
       display: block;
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      font-family: var(--mono);
+      color: var(--blue);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+    }
+
+    .checkbox-field input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--blue);
+      flex: 0 0 auto;
     }
 
     input[type="file"]:hover,
@@ -382,8 +402,16 @@
       position: relative;
       display: inline-block;
       max-width: 100%;
+      padding: var(--backdrop-pad-y, 0px) var(--backdrop-pad-x, 0px);
+      background: var(--backdrop);
       user-select: none;
       cursor: pointer;
+    }
+
+    .image-layer.backdrop-expanded {
+      max-width: none;
+      --backdrop-pad-x: 180px;
+      --backdrop-pad-y: 120px;
     }
 
     .image-layer img {
@@ -421,8 +449,6 @@
       position: absolute;
       top: -2px;
       left: 0;
-      min-width: 170px;
-      width: 240px;
       padding: 10px 12px;
       background: #fff;
       color: var(--ink);
@@ -432,6 +458,21 @@
       pointer-events: auto;
       z-index: 3;
       cursor: pointer;
+    }
+
+    .pin-popover.editing {
+      min-width: 170px;
+      width: 240px;
+    }
+
+    .pin-popover.preview {
+      width: max-content;
+      min-width: 0;
+      max-width: 240px;
+    }
+
+    .pin-popover.preview .pin-preview {
+      max-width: 216px;
     }
 
     .pin-popover:hover .pin-preview {
@@ -484,6 +525,17 @@
 
     .pin-editor-title strong {
       font-weight: 300;
+    }
+
+    .pin-editor-hint {
+      border: 1px dashed var(--blue);
+      padding: 8px 10px;
+      color: var(--blue);
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      line-height: 1.4;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.78);
     }
 
     .pin-editor input,
@@ -608,6 +660,16 @@
         <small>Use this color for the next pins.</small>
       </div>
 
+      <div class="field">
+        <label for="backdropColorInput">Backdrop color</label>
+        <input id="backdropColorInput" type="color" value="#ffffff">
+        <label class="checkbox-field" for="backdropExpandedInput">
+          <input id="backdropExpandedInput" type="checkbox">
+          Expand backdrop
+        </label>
+        <small>Add background space around the uploaded image.</small>
+      </div>
+
       <div class="mobile-note">This tool is not mobile-ready. Please use it on desktop for the best experience.</div>
 
       <div class="button-row">
@@ -650,6 +712,8 @@
     const titleInput = document.getElementById("titleInput");
     const descriptionInput = document.getElementById("descriptionInput");
     const pinColorInput = document.getElementById("pinColorInput");
+    const backdropColorInput = document.getElementById("backdropColorInput");
+    const backdropExpandedInput = document.getElementById("backdropExpandedInput");
     const downloadBtn = document.getElementById("downloadBtn");
     const clearPinsBtn = document.getElementById("clearPinsBtn");
     const statusEl = document.getElementById("status");
@@ -664,6 +728,8 @@
     let pins = [];
     let selectedPinId = null;
     let dragState = null;
+    let moveHintPinId = null;
+    const EDITING_POPOVER_WIDTH = 240;
 
     imageUpload.addEventListener("change", handleImageUpload);
     imageLayer.addEventListener("click", handleImageClick);
@@ -672,6 +738,9 @@
     titleInput.addEventListener("input", syncSelectedPinFromForm);
     descriptionInput.addEventListener("input", syncSelectedPinFromForm);
     pinColorInput.addEventListener("input", syncSelectedPinFromForm);
+    backdropColorInput.addEventListener("input", updateBackdrop);
+    backdropExpandedInput.addEventListener("change", updateBackdrop);
+    window.addEventListener("resize", renderPins);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopDragging);
 
@@ -690,10 +759,11 @@
         placeholder.hidden = true;
         pins = [];
         selectedPinId = null;
+        updateBackdrop();
         renderPins();
         renderPinList();
         updateButtons();
-        setStatus("Image loaded. Click anywhere on it to add your first pin.");
+        setStatus("Image loaded. Click the image or expanded backdrop to add your first pin.");
       };
       reader.readAsDataURL(file);
     }
@@ -718,9 +788,10 @@
         return;
       }
 
-      const rect = mainImage.getBoundingClientRect();
-      const xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
-      const yPercent = clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+      const imageRect = mainImage.getBoundingClientRect();
+      const bounds = getBackdropPercentBounds();
+      const xPercent = clamp(((event.clientX - imageRect.left) / imageRect.width) * 100, bounds.minX, bounds.maxX);
+      const yPercent = clamp(((event.clientY - imageRect.top) / imageRect.height) * 100, bounds.minY, bounds.maxY);
       const nextPinId = getNextPinId();
 
       const pin = {
@@ -734,6 +805,7 @@
 
       pins.push(pin);
       selectedPinId = pin.id;
+      moveHintPinId = null;
       renderPins();
       renderPinList();
       updateButtons();
@@ -742,14 +814,15 @@
 
     function renderPins() {
       imageLayer.querySelectorAll(".pin-node").forEach((pinNode) => pinNode.remove());
+      const metrics = getBackdropMetrics();
 
       pins.forEach((pin) => {
         const hasPinValue = Boolean(pin.title || pin.description);
         const pinNode = document.createElement("div");
         pinNode.className = "pin-node";
         pinNode.dataset.id = String(pin.id);
-        pinNode.style.left = `${pin.xPercent}%`;
-        pinNode.style.top = `${pin.yPercent}%`;
+        pinNode.style.left = `${metrics.imageOffsetX + ((pin.xPercent / 100) * metrics.imageWidth)}px`;
+        pinNode.style.top = `${metrics.imageOffsetY + ((pin.yPercent / 100) * metrics.imageHeight)}px`;
 
         const pinEl = document.createElement("button");
         pinEl.type = "button";
@@ -759,8 +832,17 @@
         pinEl.style.backgroundColor = pin.color || "#1a3aff";
 
         const popoverEl = document.createElement("div");
-        popoverEl.className = "pin-popover";
+        popoverEl.className = `pin-popover${pin.id === selectedPinId ? " editing" : " preview"}`;
         popoverEl.style.borderColor = pin.color || "#1a3aff";
+        const pinLeft = metrics.imageOffsetX + ((pin.xPercent / 100) * metrics.imageWidth);
+        if (pinLeft + EDITING_POPOVER_WIDTH > metrics.layerWidth) {
+          if (pin.id === selectedPinId) {
+            popoverEl.style.left = `${-Math.min(EDITING_POPOVER_WIDTH, pinLeft)}px`;
+          } else {
+            popoverEl.style.left = "auto";
+            popoverEl.style.right = "0";
+          }
+        }
 
         if (pin.id === selectedPinId) {
           popoverEl.innerHTML = `
@@ -769,6 +851,7 @@
                 <span>Pin ${pin.id}</span>
                 <strong>${escapeHtml(pin.title || "")}</strong>
               </div>
+              <div class="pin-editor-hint" ${moveHintPinId === pin.id ? "" : "hidden"}>Hold the pin button to move the target.</div>
               <input type="text" data-editor="title" value="${escapeHtmlAttr(pin.title || "")}" placeholder="Pin title">
               <textarea data-editor="description" placeholder="Pin description">${escapeHtml(pin.description || "")}</textarea>
               <div class="pin-editor-actions">
@@ -802,6 +885,7 @@
           closeButton.addEventListener("click", (event) => {
             event.stopPropagation();
             selectedPinId = null;
+            moveHintPinId = null;
             clearForm();
             renderPins();
             renderPinList();
@@ -831,7 +915,13 @@
           if (event.target.closest("input, textarea, button")) {
             return;
           }
+          if (pin.id === selectedPinId) {
+            moveHintPinId = pin.id;
+            renderPins();
+            return;
+          }
           selectedPinId = pin.id;
+          moveHintPinId = null;
           fillFormFromSelectedPin();
           renderPins();
           renderPinList();
@@ -844,7 +934,13 @@
           if (event.target.closest("input, textarea, button")) {
             return;
           }
+          if (pin.id === selectedPinId) {
+            moveHintPinId = pin.id;
+            renderPins();
+            return;
+          }
           selectedPinId = pin.id;
+          moveHintPinId = null;
           fillFormFromSelectedPin();
           renderPins();
           renderPinList();
@@ -856,6 +952,7 @@
         pinEl.addEventListener("click", (event) => {
           event.stopPropagation();
           selectedPinId = pin.id;
+          moveHintPinId = null;
           fillFormFromSelectedPin();
           renderPins();
           renderPinList();
@@ -865,6 +962,7 @@
         pinEl.addEventListener("pointerdown", (event) => {
           event.stopPropagation();
           selectedPinId = pin.id;
+          moveHintPinId = null;
           fillFormFromSelectedPin();
           dragState = { id: pin.id };
           pinEl.setPointerCapture(event.pointerId);
@@ -980,14 +1078,15 @@
         return;
       }
 
-      const rect = mainImage.getBoundingClientRect();
+      const imageRect = mainImage.getBoundingClientRect();
+      const bounds = getBackdropPercentBounds();
       const selectedPin = pins.find((pin) => pin.id === dragState.id);
-      if (!selectedPin || rect.width === 0 || rect.height === 0) {
+      if (!selectedPin || imageRect.width === 0 || imageRect.height === 0) {
         return;
       }
 
-      selectedPin.xPercent = clamp(((event.clientX - rect.left) / rect.width) * 100, 0, 100);
-      selectedPin.yPercent = clamp(((event.clientY - rect.top) / rect.height) * 100, 0, 100);
+      selectedPin.xPercent = clamp(((event.clientX - imageRect.left) / imageRect.width) * 100, bounds.minX, bounds.maxX);
+      selectedPin.yPercent = clamp(((event.clientY - imageRect.top) / imageRect.height) * 100, bounds.minY, bounds.maxY);
       renderPins();
     }
 
@@ -1030,6 +1129,13 @@
       downloadStatusEl.textContent = message;
     }
 
+    function updateBackdrop() {
+      const backdropColor = backdropColorInput.value || "#ffffff";
+      document.documentElement.style.setProperty("--backdrop", backdropColor);
+      imageLayer.classList.toggle("backdrop-expanded", backdropExpandedInput.checked);
+      renderPins();
+    }
+
     function escapeHtml(value) {
       return value
         .replaceAll("&", "&amp;")
@@ -1045,6 +1151,30 @@
 
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value));
+    }
+
+    function getBackdropMetrics() {
+      const layerRect = imageLayer.getBoundingClientRect();
+      const imageRect = mainImage.getBoundingClientRect();
+      return {
+        layerWidth: layerRect.width,
+        layerHeight: layerRect.height,
+        imageWidth: imageRect.width,
+        imageHeight: imageRect.height,
+        imageOffsetX: imageRect.left - layerRect.left,
+        imageOffsetY: imageRect.top - layerRect.top
+      };
+    }
+
+    function getBackdropPercentBounds() {
+      const layerRect = imageLayer.getBoundingClientRect();
+      const imageRect = mainImage.getBoundingClientRect();
+      return {
+        minX: ((layerRect.left - imageRect.left) / imageRect.width) * 100,
+        maxX: ((layerRect.right - imageRect.left) / imageRect.width) * 100,
+        minY: ((layerRect.top - imageRect.top) / imageRect.height) * 100,
+        maxY: ((layerRect.bottom - imageRect.top) / imageRect.height) * 100
+      };
     }
 
     function formatExportTimestamp(date) {
@@ -1068,17 +1198,30 @@
         return;
       }
 
+      const activePinId = selectedPinId;
+      const activeMoveHintPinId = moveHintPinId;
+      selectedPinId = null;
+      moveHintPinId = null;
+      renderPins();
+
+      try {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      canvas.width = mainImage.naturalWidth;
-      canvas.height = mainImage.naturalHeight;
-
-      ctx.drawImage(mainImage, 0, 0);
-      ctx.textBaseline = "top";
-
+      const layerRect = imageLayer.getBoundingClientRect();
       const imageRect = mainImage.getBoundingClientRect();
-      const scaleX = canvas.width / imageRect.width;
-      const scaleY = canvas.height / imageRect.height;
+      const scaleX = mainImage.naturalWidth / imageRect.width;
+      const scaleY = mainImage.naturalHeight / imageRect.height;
+      canvas.width = layerRect.width * scaleX;
+      canvas.height = layerRect.height * scaleY;
+
+      ctx.fillStyle = backdropColorInput.value || "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(
+        mainImage,
+        (imageRect.left - layerRect.left) * scaleX,
+        (imageRect.top - layerRect.top) * scaleY
+      );
+      ctx.textBaseline = "top";
 
       pins.forEach((pin) => {
         const pinNode = imageLayer.querySelector(`.pin-node[data-id="${pin.id}"]`);
@@ -1094,15 +1237,14 @@
 
         const pinNodeRect = pinNode.getBoundingClientRect();
         const pinRect = pinEl.getBoundingClientRect();
-        const popoverRect = popoverEl.getBoundingClientRect();
         const pinStyle = window.getComputedStyle(pinEl);
         const popoverStyle = window.getComputedStyle(popoverEl);
         const pinSize = parseFloat(pinStyle.width) || 28;
         const pinRadius = (pinSize / 2) * scaleX;
-        const pinLeft = (pinRect.left - imageRect.left) * scaleX;
-        const pinTop = (pinRect.top - imageRect.top) * scaleY;
-        const pinNodeLeft = (pinNodeRect.left - imageRect.left) * scaleX;
-        const pinNodeTop = (pinNodeRect.top - imageRect.top) * scaleY;
+        const pinLeft = (pinRect.left - layerRect.left) * scaleX;
+        const pinTop = (pinRect.top - layerRect.top) * scaleY;
+        const pinNodeLeft = (pinNodeRect.left - layerRect.left) * scaleX;
+        const pinNodeTop = (pinNodeRect.top - layerRect.top) * scaleY;
         const pinCenterX = pinLeft + ((parseFloat(pinStyle.width) || 28) * scaleX / 2);
         const pinCenterY = pinTop + ((parseFloat(pinStyle.height) || 28) * scaleY / 2);
         const title = pin.title.trim();
@@ -1112,10 +1254,7 @@
         }
         const popoverLeft = parseFloat(popoverStyle.left) || 0;
         const popoverTop = parseFloat(popoverStyle.top) || 0;
-        const boxX = pinNodeLeft + (popoverLeft * scaleX);
         const boxY = pinNodeTop + (popoverTop * scaleY);
-        const boxWidth = popoverRect.width * scaleX;
-        const boxInnerWidth = boxWidth - (24 * scaleX);
         const rootFontSize = parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
         const canvasFontFamily = getCanvasFontFamily(window.getComputedStyle(document.body).fontFamily);
         const titleFontSize = (0.92 * rootFontSize) * scaleX;
@@ -1126,19 +1265,30 @@
         const boxPaddingTop = 10 * scaleY;
         const boxPaddingBottom = 10 * scaleY;
         const boxRadius = (parseFloat(popoverStyle.borderRadius) || 0) * scaleX;
+        const maxBoxInnerWidth = 216 * scaleX;
+        const titleFont = `300 ${titleFontSize}px ${canvasFontFamily}`;
+        const bodyFont = `${bodyFontSize}px ${canvasFontFamily}`;
+        const titleMeasure = title
+          ? Math.min(measureTextWithFont(ctx, title, titleFont), maxBoxInnerWidth)
+          : 0;
+        const descriptionMeasure = description
+          ? Math.min(measureTextWithFont(ctx, description, bodyFont), maxBoxInnerWidth)
+          : 0;
+        const boxInnerWidth = Math.max(titleMeasure, descriptionMeasure, 1);
+        const boxWidth = boxInnerWidth + (boxPaddingX * 2);
+        const boxX = popoverEl.style.right === "0px" || popoverEl.style.right === "0"
+          ? pinNodeLeft - boxWidth
+          : pinNodeLeft + (popoverLeft * scaleX);
         const lines = description
-          ? wrapText(ctx, description, boxInnerWidth, `${bodyFontSize}px ${canvasFontFamily}`)
+          ? wrapText(ctx, description, boxInnerWidth, bodyFont)
           : [];
         const titleWrap = title
-          ? wrapText(ctx, title, boxInnerWidth, `300 ${titleFontSize}px ${canvasFontFamily}`)
+          ? wrapText(ctx, title, boxInnerWidth, titleFont)
           : [];
         const titleBlockHeight = titleWrap.length * titleLineHeight;
         const bodyBlockHeight = lines.length * bodyLineHeight;
         const contentGap = titleWrap.length && lines.length ? 4 * scaleY : 0;
-        const boxHeight = Math.max(
-          popoverRect ? popoverRect.height * scaleY : 0,
-          boxPaddingTop + titleBlockHeight + contentGap + bodyBlockHeight + boxPaddingBottom
-        );
+        const boxHeight = boxPaddingTop + titleBlockHeight + contentGap + bodyBlockHeight + boxPaddingBottom;
 
         ctx.fillStyle = pin.color || "#1a3aff";
         ctx.beginPath();
@@ -1156,14 +1306,14 @@
 
         ctx.fillStyle = pin.color || "#1a3aff";
         ctx.textAlign = "left";
-        ctx.font = `300 ${titleFontSize}px ${canvasFontFamily}`;
+        ctx.font = titleFont;
         titleWrap.forEach((line, index) => {
           const lineY = boxY + boxPaddingTop + (index * titleLineHeight);
           ctx.fillText(line, boxX + boxPaddingX, lineY);
         });
 
         ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#5c6773";
-        ctx.font = `${bodyFontSize}px ${canvasFontFamily}`;
+        ctx.font = bodyFont;
         lines.forEach((line, index) => {
           const lineY = boxY + boxPaddingTop + titleBlockHeight + contentGap + (index * bodyLineHeight);
           ctx.fillText(line, boxX + boxPaddingX, lineY);
@@ -1176,6 +1326,12 @@
       link.download = `2ru2ro-annotated-${exportTimestamp}.png`;
       link.click();
       setDownloadStatus("Download started.");
+      } finally {
+      selectedPinId = activePinId;
+      moveHintPinId = activeMoveHintPinId;
+      renderPins();
+      renderPinList();
+      }
     }
 
     function wrapText(ctx, text, maxWidth, font = "16px Georgia") {
@@ -1203,6 +1359,11 @@
       }
 
       return lines;
+    }
+
+    function measureTextWithFont(ctx, text, font) {
+      ctx.font = font;
+      return ctx.measureText(text).width;
     }
 
     function roundRect(ctx, x, y, width, height, radius) {
